@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Login</title>
+<style>
+  :root{--c:#243b55}
+  body{background:linear-gradient(135deg,#141e30,#243b55);font-family:Arial,sans-serif;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;box-sizing:border-box}
+  .login{background:#fff;padding:35px;border-radius:15px;width:300px;text-align:center;box-shadow:0 5px 25px #0005}
+  input{width:90%;padding:12px;margin:10px 0;border:1px solid #ccc;border-radius:7px;box-sizing:border-box}
+  button{width:100%;padding:12px;background:var(--c);color:#fff;border:none;border-radius:7px;cursor:pointer;margin-top:12px}
+  button:hover{filter:brightness(.8)}
+  #error{color:red}
+  #dashboard{display:none;width:100%;max-width:820px;background:#fff;border-radius:15px;box-shadow:0 5px 25px #0005;overflow:hidden}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;background:var(--c);color:#fff}
+  .top h2{margin:0;font-size:18px}
+  .top button{width:auto;margin:0;padding:8px 16px;background:#fff;color:var(--c)}
+  .tabs{display:flex;border-bottom:1px solid #ddd}
+  .tabs button{flex:1;margin:0;border-radius:0;background:#f3f5f8;color:var(--c);padding:14px}
+  .tabs button.active{background:#fff;font-weight:bold;border-bottom:3px solid var(--c)}
+  .panel{display:none;padding:22px;text-align:left}
+  .panel.show{display:block}
+  .linkbtn{display:block;padding:14px;margin:10px 0;background:var(--c);color:#fff;text-decoration:none;border-radius:8px;text-align:center}
+  .linkbtn:hover{filter:brightness(.8)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px}
+  .grid img{width:100%;height:120px;object-fit:cover;border-radius:8px;display:block}
+  .photo{position:relative}
+  .photo .del{position:absolute;top:4px;right:4px;width:auto;margin:0;padding:3px 8px;background:#c0392b;border-radius:5px}
+  .row{display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap}
+  .row input{margin:0;flex:1;min-width:120px;width:auto}
+  .row button{width:auto;margin:0;padding:10px 12px}
+  .rm{background:#c0392b}
+  .gray{background:#667}
+  h3{margin:26px 0 6px;color:var(--c);border-top:1px solid #eee;padding-top:16px}
+  h3:first-child{border:0;margin-top:0;padding-top:0}
+  .muted{color:#667;font-size:13px}
+  .ok{color:#1e8449;font-size:14px;min-height:18px;margin:6px 0 0}
+  input[type=color]{padding:2px;height:42px;flex:0 0 60px;min-width:60px}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <h2>🔐 Personal Login</h2>
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">LOGIN</button>
+  <p id="error"></p>
+</div>
+
+<div id="dashboard">
+  <div class="top"><h2><span id="siteTitle"></span>, <span id="welcome"></span> 🎉</h2><button onclick="logout()">LOGOUT</button></div>
+  <div class="tabs" id="tabs">
+    <button data-tab="links" class="active">🔗 Links</button>
+    <button data-tab="photos">🖼️ Photos</button>
+    <button data-tab="control" id="controlTab">⚙️ Control</button>
+  </div>
+
+  <div class="panel show" id="panel-links"></div>
+
+  <div class="panel" id="panel-photos">
+    <input type="file" id="photoInput" accept="image/*" multiple style="width:auto">
+    <p class="muted">Choose one or more photos to upload. They are saved in this browser.</p>
+    <div class="grid" id="photoGrid"></div>
+  </div>
+
+  <div class="panel" id="panel-control">
+    <h3>Links</h3>
+    <p class="muted">Edit a name or URL and it saves automatically. Use ↑ ↓ to reorder.</p>
+    <div id="linkEditor"></div>
+    <div class="row">
+      <input id="newLinkName" placeholder="New link name">
+      <input id="newLinkUrl" placeholder="https://...">
+      <button onclick="addLink()">+ Add link</button>
+    </div>
+    <p class="ok" id="linkMsg"></p>
+
+    <h3>Site settings</h3>
+    <div class="row">
+      <input id="titleInput" placeholder="Welcome title">
+      <input type="color" id="colorInput" title="Main color">
+      <button onclick="saveSettings()">Save</button>
+    </div>
+    <p class="ok" id="setMsg"></p>
+
+    <h3>Photos</h3>
+    <div class="row">
+      <span id="photoCount" class="muted"></span>
+      <button onclick="clearPhotos()" class="rm">Delete all photos</button>
+    </div>
+
+    <h3>Users</h3>
+    <div id="userEditor"></div>
+    <div class="row">
+      <input id="newUser" placeholder="New username">
+      <input id="newPass" placeholder="Password">
+      <button onclick="addUser()">+ Add user</button>
+    </div>
+    <p class="ok" id="userMsg"></p>
+
+    <h3>Backup and reset</h3>
+    <div class="row">
+      <button onclick="exportData()">Download backup</button>
+      <button onclick="$('importInput').click()" class="gray">Restore backup</button>
+      <button onclick="resetAll()" class="rm">Reset everything</button>
+      <input type="file" id="importInput" accept=".json" style="display:none">
+    </div>
+    <p class="ok" id="backupMsg"></p>
+  </div>
+</div>
+
+<script>
+  const ADMIN = "siddop";
+  const defaultUsers = {sidd:"sidd1", op:"op2", goyal:"3", siddop:"goyalop"};
+  const defaultLinks = [
+    {name:"Datanodes Download 1", url:"https://datanodes.to/download"},
+    {name:"Datanodes Download 2", url:"https://datanodes.to/download"},
+    {name:"YouTube", url:"https://www.youtube.com/"}
+  ];
+  const defaultSettings = {title:"Welcome", color:"#243b55"};
+
+  const $ = id => document.getElementById(id);
+  function load(key, fallback){
+    try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch(e){ return fallback; }
+  }
+  function save(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); return true; }
+    catch(e){ alert("Could not save. Browser storage may be full."); return false; }
+  }
+
+  let users = load("users", defaultUsers);
+  users[ADMIN] = users[ADMIN] || "goyalop";
+  let links = load("links", defaultLinks);
+  let photos = load("photos", []);
+  let settings = Object.assign({}, defaultSettings, load("settings", {}));
+  let current = null;
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+  function applySettings(){
+    document.documentElement.style.setProperty("--c", settings.color);
+    $("siteTitle").textContent = settings.title;
+    $("titleInput").value = settings.title;
+    $("colorInput").value = settings.color;
+  }
+  applySettings();
+
+  function login(){
+    const u = $("username").value.trim();
+    const p = $("password").value;
+    if (has(users, u) && users[u] === p){
+      current = u;
+      $("login").style.display = "none";
+      $("dashboard").style.display = "block";
+      $("welcome").textContent = u;
+      $("controlTab").style.display = (u === ADMIN) ? "block" : "none";
+      showTab("links");
+      renderAll();
+    } else {
+      $("error").textContent = "Wrong username or password!";
+    }
+  }
+  function logout(){
+    current = null;
+    $("dashboard").style.display = "none";
+    $("login").style.display = "block";
+    $("username").value = ""; $("password").value = ""; $("error").textContent = "";
+  }
+
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  function showTab(name){
+    if (name === "control" && current !== ADMIN) return;
+    document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("show", p.id === "panel-" + name));
+  }
+
+  const safeUrl = u => /^https?:\/\//i.test(u) ? u : "https://" + u;
+  function msg(id, text){ $(id).textContent = text; }
+
+  function renderAll(){ renderLinks(); renderPhotos(); renderLinkEditor(); renderUsers(); applySettings(); }
+
+  // ---------- Links ----------
+  function renderLinks(){
+    const box = $("panel-links");
+    box.innerHTML = "";
+    if (!links.length){
+      const p = document.createElement("p"); p.className = "muted";
+      p.textContent = "No links yet. The admin can add links in the Control tab.";
+      box.appendChild(p); return;
+    }
+    links.forEach(l => {
+      const a = document.createElement("a");
+      a.className = "linkbtn"; a.href = safeUrl(l.url);
+      a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.textContent = l.name || l.url;
+      box.appendChild(a);
+    });
+  }
+
+  function renderLinkEditor(){
+    const box = $("linkEditor");
+    box.innerHTML = "";
+    links.forEach((l, i) => {
+      const r = document.createElement("div"); r.className = "row";
+      const n = document.createElement("input"); n.value = l.name; n.placeholder = "Name";
+      const u = document.createElement("input"); u.value = l.url; u.placeholder = "https://...";
+      n.oninput = () => { links[i].name = n.value; persistLinks(false); };
+      u.oninput = () => { links[i].url = u.value; persistLinks(false); };
+      const up = document.createElement("button"); up.textContent = "↑"; up.className = "gray";
+      up.onclick = () => move(i, -1);
+      const dn = document.createElement("button"); dn.textContent = "↓"; dn.className = "gray";
+      dn.onclick = () => move(i, 1);
+      const rm = document.createElement("button"); rm.textContent = "Delete"; rm.className = "rm";
+      rm.onclick = () => { if (confirm("Delete this link?")){ links.splice(i, 1); persistLinks(true); } };
+      r.append(n, u, up, dn, rm);
+      box.appendChild(r);
+    });
+  }
+
+  function persistLinks(rerender){
+    save("links", links);
+    renderLinks();
+    if (rerender) renderLinkEditor();
+    msg("linkMsg", "Saved.");
+  }
+  function move(i, d){
+    const j = i + d;
+    if (j < 0 || j >= links.length) return;
+    [links[i], links[j]] = [links[j], links[i]];
+    persistLinks(true);
+  }
+  function addLink(){
+    const name = $("newLinkName").value.trim(), url = $("newLinkUrl").value.trim();
+    if (!url){ msg("linkMsg", "Enter a URL for the new link."); return; }
+    links.push({name: name || url, url});
+    $("newLinkName").value = ""; $("newLinkUrl").value = "";
+    persistLinks(true);
+    msg("linkMsg", "Link added.");
+  }
+
+  // ---------- Settings ----------
+  function saveSettings(){
+    settings.title = $("titleInput").value.trim() || "Welcome";
+    settings.color = $("colorInput").value;
+    save("settings", settings);
+    applySettings();
+    msg("setMsg", "Settings saved.");
+  }
+
+  // ---------- Photos ----------
+  function renderPhotos(){
+    const grid = $("photoGrid");
+    grid.innerHTML = "";
+    $("photoCount").textContent = photos.length + " photo(s) saved";
+    if (!photos.length){
+      const p = document.createElement("p"); p.className = "muted";
+      p.textContent = "No photos yet. Upload your first photo above.";
+      grid.appendChild(p); return;
+    }
+    photos.forEach((src, i) => {
+      const d = document.createElement("div"); d.className = "photo";
+      const img = document.createElement("img"); img.src = src;
+      d.appendChild(img);
+      if (current === ADMIN){
+        const x = document.createElement("button"); x.className = "del"; x.textContent = "✕";
+        x.onclick = () => { photos.splice(i, 1); save("photos", photos); renderPhotos(); };
+        d.appendChild(x);
+      }
+      grid.appendChild(d);
+    });
+  }
+  function compress(file){
+    return new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const s = Math.min(1, 800 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = img.width * s; c.height = img.height * s;
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          res(c.toDataURL("image/jpeg", 0.7));
+        };
+        img.onerror = () => res(null);
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  $("photoInput").onchange = async e => {
+    for (const f of e.target.files){
+      const data = await compress(f);
+      if (data) photos.push(data);
+    }
+    save("photos", photos);
+    e.target.value = "";
+    renderPhotos();
+  };
+  function clearPhotos(){
+    if (confirm("Delete all photos?")){ photos = []; save("photos", photos); renderPhotos(); }
+  }
+
+  // ---------- Users ----------
+  function renderUsers(){
+    const box = $("userEditor");
+    box.innerHTML = "";
+    Object.keys(users).forEach(name => {
+      const r = document.createElement("div"); r.className = "row";
+      const n = document.createElement("input"); n.value = name; n.disabled = true;
+      const p = document.createElement("input"); p.value = users[name];
+      const s = document.createElement("button"); s.textContent = "Save password";
+      s.onclick = () => {
+        if (!p.value){ msg("userMsg", "Password cannot be empty."); return; }
+        users[name] = p.value; save("users", users);
+        msg("userMsg", "Password updated for " + name + ".");
+      };
+      r.append(n, p, s);
+      if (name !== ADMIN){
+        const d = document.createElement("button"); d.className = "rm"; d.textContent = "Delete";
+        d.onclick = () => { if (confirm("Delete user " + name + "?")){ delete users[name]; save("users", users); renderUsers(); } };
+        r.append(d);
+      }
+      box.appendChild(r);
+    });
+  }
+  function addUser(){
+    const u = $("newUser").value.trim(), p = $("newPass").value;
+    if (!u || !p){ msg("userMsg", "Enter a username and a password."); return; }
+    if (has(users, u)){ msg("userMsg", "That username already exists."); return; }
+    users[u] = p; save("users", users);
+    $("newUser").value = ""; $("newPass").value = "";
+    renderUsers();
+    msg("userMsg", "User " + u + " added.");
+  }
+
+  // ---------- Backup and reset ----------
+  function exportData(){
+    const blob = new Blob([JSON.stringify({users, links, photos, settings})], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "site-backup.json";
+    a.click(); URL.revokeObjectURL(a.href);
+    msg("backupMsg", "Backup downloaded.");
+  }
+  $("importInput").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        const d = JSON.parse(r.result);
+        if (d.users && has(d.users, ADMIN)) users = d.users;
+        if (Array.isArray(d.links)) links = d.links;
+        if (Array.isArray(d.photos)) photos = d.photos;
+        if (d.settings) settings = Object.assign({}, defaultSettings, d.settings);
+        save("users", users); save("links", links); save("photos", photos); save("settings", settings);
+        renderAll(); msg("backupMsg", "Backup restored.");
+      } catch(err){ msg("backupMsg", "That file is not a valid backup."); }
+    };
+    r.readAsText(f); e.target.value = "";
+  };
+  function resetAll(){
+    if (!confirm("Reset links, photos, users and settings to the defaults?")) return;
+    users = JSON.parse(JSON.stringify(defaultUsers));
+    links = JSON.parse(JSON.stringify(defaultLinks));
+    photos = []; settings = Object.assign({}, defaultSettings);
+    save("users", users); save("links", links); save("photos", photos); save("settings", settings);
+    renderAll(); msg("backupMsg", "Everything was reset.");
+  }
+
+  $("password").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+</script>
+</body>
+</html>
